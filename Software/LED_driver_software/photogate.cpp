@@ -41,7 +41,6 @@ void photogate::pulseTimer(){
 }
 
 void photogate::sendSync(){
-  Serial.println(output_pin);
   pinMode(output_pin, OUTPUT);
   digitalWriteFast(output_pin, LOW);
   delayMicroseconds(300);

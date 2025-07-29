@@ -8,7 +8,7 @@
 //#include "TimerInterrupt_Generic.h"
 
 constexpr struct pulseStruct{
-  uint32_t duration = 1; //Total duration of LED pulse in µs - shortest pulse is 84 µs
+  uint32_t duration = 100; //Total duration of LED pulse in µs - shortest pulse is 84 µs
   float current = 3; //Peak output current in amps
   uint16_t plunger_delay = 6000; //How long in ms before the plunger starts to fall
   uint16_t  led_delay = 14000; //Delay from trigger event to LED on: 0-65535 µs Enter - 14000, Exit - 36000 µs
@@ -208,8 +208,8 @@ void ledPulse(){
   uint32_t led_time;
   uint32_t timer[3];
   uint32_t measured_plunger_delay;
-  float start_current;
-  float avg_current;
+  float start_current = 0;
+  float avg_current = 0;
   uint32_t n_samples = 0;
   bool ps_stable;
   float prev_voltage;
@@ -327,7 +327,7 @@ void ledPulse(){
     checkCurrent();
     start_current = status.driver_current;
     avg_current += start_current;
-    n_samples++;
+    n_samples = 1;
     while(pulse_timer - timer[0] < capped_pulse_duration){
       checkCurrent();
       avg_current += status.driver_current;
