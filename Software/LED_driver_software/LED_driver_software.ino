@@ -8,12 +8,12 @@
 //#include "TimerInterrupt_Generic.h"
 
 constexpr struct pulseStruct{
-  uint32_t duration = 1000; //Total duration of LED pulse in µs
-  float current = 0.1; //Peak output current in amps
+  uint32_t duration = 1; //Total duration of LED pulse in µs - shortest pulse is 84 µs
+  float current = 3; //Peak output current in amps
   uint16_t plunger_delay = 6000; //How long in ms before the plunger starts to fall
-  uint16_t  led_delay = 500; //Delay from trigger event to LED on: 0-65535 µs
+  uint16_t  led_delay = 14000; //Delay from trigger event to LED on: 0-65535 µs Enter - 14000, Exit - 36000 µs
   uint16_t cooldown_period = 5000; //Cooldown delay after LED turns off: 0-65535 ms
-  float voltage = 41; //Power supply voltage for the pulse.  -1 = autocalibrate the voltage
+  float voltage = 155; //Power supply voltage for the pulse.  -1 = autocalibrate the voltage
   bool timing_test = false; //Whether to strobe the light in 1/10 second intervals for delay timing 
 } pulse;
 
@@ -119,6 +119,7 @@ const uint32_t MAX_DURATION = 200000; //Maximum duration of LED pulse- prevents 
 uint8_t status_index;
 bool flash; //Tracks whether led is on or off when flashing
 float pulse_voltage;
+const uint32_t PHOTOGATE_TIMEOUT = 20e6-((uint32_t) pulse.plunger_delay * 1000);
 
 powerSupply ps;
 photogate pg(in.photogate);
@@ -131,6 +132,11 @@ void(* resetFunc) (void) = 0;//declare reset function at address 0
 void setup() {
   //Sertup serial
   Serial.begin(250000);
+  DIDR0 = 0; //Disable interrupts on analog pins
+  bitSet(ADCSRA, ADPS2); //Set ADC prescaler to 32 - 101 = 32, 100 = 16, 011 = 8, 010 = 4, 001 = 2 (2->0)
+  bitClear(ADCSRA, ADPS1); 
+  bitSet(ADCSRA, ADPS0);
+  
   //pinMode(in.photogate, OUTPUT);
   //pinMode(in.photogate, INPUT);
   // while(true){
@@ -204,7 +210,7 @@ void ledPulse(){
   uint32_t measured_plunger_delay;
   float start_current;
   float avg_current;
-  uint32_t n_samples;
+  uint32_t n_samples = 0;
   bool ps_stable;
   float prev_voltage;
   uint32_t capped_pulse_duration; //Duration of pulse, capped at MAX_DURATION for safety
@@ -269,8 +275,7 @@ void ledPulse(){
   if(pg.startPhotogate()) Serial.println("Photogate ready, sending trigger...");
   else{
     Serial.println("Photogate failed to initialize, resetting driver...");
-    failSafe();
-    return;
+    goto pulse_complete;
   }
 
   //Press pedal
@@ -304,14 +309,13 @@ void ledPulse(){
       }
     }
     timer[1] = pulse_timer;
-    while(digitalReadFast(in.photogate) && pulse_timer - timer[1] < 1000000); //Wait up to one second for the photogate to trip
+    while(digitalReadFast(in.photogate) && pulse_timer - timer[1] < PHOTOGATE_TIMEOUT); //Wait up to three seconds for the photogate to trip
     timer[0] = pulse_timer;
     status.state = state.led_on;
     measured_plunger_delay = driver_timer - timer[2];
-    if(pulse_timer - timer[1] > 1000000){
+    if(pulse_timer - timer[1] > PHOTOGATE_TIMEOUT){
       Serial.println("Error: Photogate failed to trigger.");
-      failSafe();
-      return;
+      goto pulse_complete;
     }
     while(pulse_timer - timer[0] < pulse.led_delay); //Wait for pulse timer
     digitalWriteFast(out.led_trigger, HIGH);
@@ -334,6 +338,7 @@ void ledPulse(){
         checkStatus();
       }
     }
+pulse_complete:
     digitalWriteFast(out.led_trigger, LOW);
     timer[1] = pulse_timer;
     ps.toggleOutput(false);

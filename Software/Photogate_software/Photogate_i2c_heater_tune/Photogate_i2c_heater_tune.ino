@@ -18,6 +18,7 @@ const int PCB_THERMISTOR_NOMINAL = 4700; //Value of thermistor resistor on PCB a
 const int PCB_B_COEFFICIENT = 3545; //Beta value for the PCB thermistor
 const uint16_t ADC_MAX = 1024; //Maximum value of the 10-bit ADC
 const float HEATER_SET_TEMP = 40; //Temperature of the board heaters
+const uint8_t COMPARATOR_THRESHOLD = 200; //Sets the triggering threshold for the comparator
 
 uint8_t serial_buffer[20]; //Buffer for sending diagnostic information
 uint8_t buffer_len = 0; //Length of serial packet to be sent
@@ -29,7 +30,7 @@ uint8_t photodiode_gain; //8-bit resitor value used to set photodiode gain
 uint8_t led_intensity; //8-bit resistor value used to set LED current
 uint8_t photogate_state = 0; //0 = inactive; 1 = beam intact; 2 = beam broken
 uint32_t elapsed_photogate = 0; //Time in ms photodiode has been waiting for trigger
-const uint16_t PHOTOGATE_TIMEOUT = 10000; //Time in ms to wait for photogate to be tripped
+const uint16_t PHOTOGATE_TIMEOUT = 20000; //Time in ms to wait for photogate to be tripped
 volatile uint32_t interrupt_duration; //Duration that output pin was pulled low
 
 union BYTE16UNION
@@ -128,7 +129,7 @@ void startComparator(){
   Comparator1.input_p = comparator::in_p::in0;       // pos input PA7.  See datasheet
   Comparator1.input_n = comparator::in_n::dacref;    // neg pin to the DACREF voltage
   Comparator1.reference = comparator::ref::vref_4v3; // Set the DACREF voltage
-  Comparator1.dacref = 127;                          // (dacref/256)*VREF
+  Comparator1.dacref = COMPARATOR_THRESHOLD;                          // (dacref/256)*VREF
 
   Comparator1.hysteresis = comparator::hyst::large;  // Use 50mV hysteresis
   Comparator1.output = comparator::out::enable;      // Enable output PB3
